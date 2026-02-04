@@ -1,0 +1,13 @@
+# 虚拟环境（最重要！）
+venv/
+.env/
+.env.local
+
+# Python 运行时产生的垃圾文件（常见问题）
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 其他可选（如果你以后有日志或临时文件）
+*.log
