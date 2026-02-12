@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RealTime Weather</title>
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+        body {
+            background: linear-gradient(135deg, #1c2534, #0f172a);
+            color: white;
+            font-family: sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .city {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        .temp-row {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .ai-box {
+            background: rgba(56, 189, 248, 0.1);
+            border-left: 4px solid #38bdf8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        .ai-title {
+            color: #38bdf8;
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .time {
+            font-size: 0.7rem;
+            opacity: 0.5;
+            margin-top: 20px;
+            text-align: right;
+        }
+
+        /* 闪烁的光标效果 */
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 18px;
+            background-color: #ffffff;
+            margin-left: 4px;
+            vertical-align: middle;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .loading-container {
+            display: flex;
+            align-items: center;
+        }
+
+        /* deepseek常规输出加载动画样式 */
+        /* .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(56, 189, 248, 0.3);
+            border-radius: 50%;
+            border-top-color: #38bdf8;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #38bdf8;
+            opacity: 0.8;
+            font-size: 0.9rem;
+        } */
+
+        .back-btn {
+            position: absolute;
+            top: 30px;
+            right: 27px;
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+            cursor: pointer;
+            display: inline-block;
+            padding: 8px 12px;
+            z-index: 10;
+        }
+
+        .back-btn:hover {
+            color: #ffffff; 
+        }
+    </style>
+</head>
+<body>
+    <div class="card" style="position: relative;">
+        <a href="/" class="back-btn">Back</a>
+
+        <div class="city">📍 {{ province }} {{ city }}</div>
+        <div class="temp-row">
+            {{ temp }}°C 
+            <span style="font-size: 1.5rem; font-weight: normal;">| {{ text }}</span>
+        </div>
+        <div class="details">
+            体感 {{ feelsLike }}°C · 湿度 {{ humidity }}%
+        </div>
+        <div class="ai-box">
+            <div class="ai-title">GlaDOS 的建议</div>
+            <div id="ai-content" class="ai-content">
+                <div class="cursor"></div>
+                <!-- <span class="loading-text">DeepSeek 正在思考中...</span> -->
+            </div>
+        </div>
+        <div class="time">最后更新：{{ obsTime }}</div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const aiContent = document.getElementById('ai-content');
+
+            const params = new URLSearchParams({
+                province: '{{ province }}',
+                city: '{{ city }}',
+                text: '{{ text }}',
+                temp: '{{ temp }}',
+                feelsLike: '{{ feelsLike }}',
+                humidity: '{{ humidity }}'
+            });
+
+            // 1. 发起请求
+            fetch(`/weather/ai?${params.toString()}`)
+                .then(response => {
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    
+                    // 清空初始化文字，准备注入流
+                    aiContent.innerHTML = '<span id="streaming-text"></span><span class="cursor"></span>';
+                    const textSpan = document.getElementById('streaming-text');
+
+                    // 2. 递归读取数据块
+                    function read() {
+                        return reader.read().then(({ done, value }) => {
+                            if (done) {
+                                const cursor = document.querySelector('.cursor');
+                                if (cursor) cursor.remove(); 
+                                return;
+                            }
+                            // 解码并追加文字
+                            const chunk = decoder.decode(value, { stream: true });
+                            textSpan.innerText += chunk; 
+                            return read(); // 继续读取
+                        });
+                    }
+                    return read();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    aiContent.innerHTML = '<span style="color: #ef4444;">核心组件丢失。</span>';
+                });
+        });
+    </script>
+</body>
+</html>
